@@ -535,3 +535,294 @@ SELECT u.*
 FROM users AS u
 JOIN orders AS O
 ON o.customer_id = u.id;
+
+----LEFT - бере всю інформацію з юзерів (навіть якщо юзери не робили замовлення) + інформація з ордерсів,  
+
+SELECT u.*
+FROM users AS u
+LEFT JOIN orders AS O
+ON o.customer_id = u.id;
+
+---- RIGHT - все спільне для обох множин + те що справа не спільне
+
+SELECT u.*
+FROM users AS u
+RIGHT JOIN orders AS O
+ON o.customer_id = u.id;
+
+-------LEFT OUTER-----
+----Інформація про користувачів, які не робили замовлень
+
+SELECT u.*
+FROM users AS u
+LEFT JOIN orders AS O
+ON o.customer_id = u.id
+WHERE o.id IS NULL;
+
+
+------ FULL - все з обох таблиць
+
+SELECT u.*
+FROM users AS u
+FULL JOIN orders AS O
+ON o.customer_id = u.id;
+
+
+-----------------------
+
+/* 
+Знайти id замовлень, в яких є телефони бренду Samsung
+*/
+
+SELECT otp.order_id, p.model
+FROM orders_to_products AS otp
+JOIN products AS p 
+ON otp.product_id = p.id
+WHERE p.brand = 'Samsung';
+
+/* 
+Кількість замовлень кожної моделі бренду Самсунг 
+*/
+
+SELECT p.model, count(*) AS amount
+FROM orders_to_products AS otp
+JOIN products AS p 
+ON otp.product_id = p.id
+WHERE p.brand = 'Samsung'
+GROUP BY p.model;
+
+/* 
+Дізнатись email користувачів, які замовляли '22 model 19' 
+*/
+
+SELECT email 
+FROM users AS u
+JOIN orders AS o
+ON o.customer_id = u.id
+JOIN orders_to_products AS otp
+ON o.id = otp.order_id
+JOIN products AS p
+ON otp.product_id = p.id
+WHERE p.model = '22 model 19';
+
+
+/*
+Знайти телефони, які ніхто не купував
+*/
+SELECT *
+FROM products AS p
+JOIN orders_to_products AS otp
+ON p.id = otp.product_id
+WHERE otp.order_id IS NULL;
+
+/*
+Вивести id замовленнь разом з їхньою повною вартістю
+(кількість*ціну телефона)
+*/
+
+SELECT otp.order_id, sum(otp.quantity * p.price) AS sum_price
+FROM products AS p 
+JOIN orders_to_products AS otp
+ON p.id = otp.product_id
+GROUP BY otp.order_id;
+
+
+
+/*
+1. Витягти всі замовлення, в яких були куплені телефони samsung
+*/
+
+SELECT otp.order_id
+FROM products AS p 
+JOIN orders_to_products AS otp
+ON otp.product_id = product_id
+WHERE p.brand = 'Samsung'
+GROUP BY otp.order_id;
+
+/*
+2. Вивести мейл юзера і кількість його замовлень
+*/
+
+SELECT u.email, count(*) AS orders_quantity
+FROM orders AS o
+JOIN users AS u 
+ON u.id = o.customer_id
+GROUP BY u.email;
+
+/*
+3. Номери замовлень і кількість позицій в кожному замовленні
+*/
+
+SELECT order_id , sum(quantity)
+FROM orders_to_products AS otp
+GROUP BY order_id
+ORDER BY order_id;
+
+/*
+4. Знайти найпопулярніший телефон (він купувався найбільшу кількість разів).
+*/
+
+SELECT p.brand, p.model, sum(otp.quantity)
+FROM products AS p 
+JOIN orders_to_products AS otp
+ON p.id = otp.product_id
+GROUP BY p.model, p.brand
+ORDER BY sum(otp.quantity) DESC
+LIMIT 1;
+
+/*
+1. Розрахувати середній чек всього магазину (середня вартість ВСІХ замовлень)
+*/
+SELECT avg(o_w_sum.order_sum) 
+    FROM (
+        SELECT order_id , (sum(otp.quantity * p.price)) AS order_sum
+        FROM products AS p
+        JOIN orders_to_products AS otp
+        ON p.id = otp.product_id
+        GROUP BY order_id
+    ) AS o_w_sum;
+
+
+/*
+2. Знайти користувача, який зробив найбільшу сумму замовлень в магазині.
+*/
+
+SELECT u.*, sum(p.price * otp.quantity)
+FROM users AS u
+JOIN orders AS o
+ON u.id = customer_id
+JOIN orders_to_products AS otp
+ON o.id = otp.order_id
+JOIN products AS p
+ON p.id = otp.product_id
+GROUP BY u.id
+ORDER BY sum(p.price * otp.quantity) DESC
+LIMIT 1;
+
+
+/*
+3. Найпопулярніший бренд (сума продажів всіх екземплярів всіх моделей)
+*/
+
+SELECT p.brand, sum(otp.quantity)
+FROM products AS p
+JOIN orders_to_products AS otp
+ON p.id = otp.product_id
+GROUP BY p.brand
+ORDER BY sum(otp.quantity) DESC
+LIMIT 1;
+
+SELECT * FROM products
+ORDER BY brand
+
+/*
+4. Витягти всі замовлення вартістю більше середнього чека магазину
+*/
+
+-- середній чек
+SELECT avg(o_w_sum.order_sum) 
+    FROM (
+        SELECT order_id , (sum(otp.quantity * p.price)) AS order_sum
+        FROM products AS p
+        JOIN orders_to_products AS otp
+        ON p.id = otp.product_id
+        GROUP BY order_id
+    ) AS o_w_sum;
+
+-- всі замовлення вартістю більше середнього чека магазину
+SELECT *
+FROM (
+    SELECT order_id , (sum(otp.quantity * p.price)) AS total_sum
+    FROM products AS p
+    JOIN orders_to_products AS otp
+    ON p.id = otp.product_id
+    GROUP BY order_id
+) AS o_w_sum
+WHERE o_w_sum.total_sum > (
+        SELECT avg(o_w_sum.order_sum) 
+            FROM (
+                SELECT order_id , (sum(otp.quantity * p.price)) AS order_sum
+                FROM products AS p
+                JOIN orders_to_products AS otp
+                ON p.id = otp.product_id
+                GROUP BY order_id
+            ) AS o_w_sum
+        )
+ORDER BY o_w_sum.total_sum;
+
+/*
+WITH "псевдонім" AS (табличний вираз)
+с помощью WITH ми можемо потім використовували цю табл за псевдонімом
+SELECT ...
+FROM "псевдонім"
+*/
+
+    WITH orders_with_costs AS (
+        SELECT order_id , (sum(otp.quantity * p.price)) AS total_sum
+        FROM products AS p
+        JOIN orders_to_products AS otp
+        ON p.id = otp.product_id
+        GROUP BY order_id
+    )
+    SELECT owc.*
+    FROM orders_with_costs AS owc
+    WHERE owc.total_sum > (
+        SELECT avg(o_w_sum.order_sum) 
+            FROM (
+                SELECT order_id , (sum(otp.quantity * p.price)) AS order_sum
+                FROM products AS p
+                JOIN orders_to_products AS otp
+                ON p.id = otp.product_id
+                GROUP BY order_id
+            ) AS o_w_sum
+    )
+    ORDER BY owc.total_sum;
+/*
+5. Витягти всіх юзерів, кількість замовлень яких вище середнього
+*/
+
+-- сер кількість замовлень
+SELECT avg (u_w_sum_o.sum_orders)
+    FROM (
+        SELECT u.id, count(*) AS sum_orders
+        FROM users AS u
+        JOIN orders AS o
+        ON u.id = customer_id
+        GROUP BY u.id
+    ) as u_w_sum_o
+
+-- всі юзери, кількість замовлень яких вище середнього
+
+SELECT *
+    FROM (
+        SELECT u.id, count(*) AS total_orders
+        FROM users AS u
+        JOIN orders AS o
+        ON u.id = customer_id
+        GROUP BY u.id
+    ) AS u_w_osum
+WHERE u_w_osum.total_orders > (
+    SELECT avg (u_w_sum_o.sum_orders)
+    FROM (
+        SELECT u.id, count(*) AS sum_orders
+        FROM users AS u
+        JOIN orders AS o
+        ON u.id = customer_id
+        GROUP BY u.id
+    ) as u_w_sum_o
+)
+ORDER BY u_w_osum.total_orders;
+
+
+/*
+6. Витягти юзерів і кількість куплених ними моделей телефонів.
+*/
+
+SELECT u.id, count(otp.product_id)
+FROM users AS u
+JOIN orders AS o  
+ON u.id = customer_id
+JOIN orders_to_products AS otp
+ON o.id = order_id
+GROUP BY u.id
+ORDER BY u.id;
